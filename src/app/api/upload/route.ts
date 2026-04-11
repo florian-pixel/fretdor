@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { existsSync } from 'fs';
+import { put } from '@vercel/blob';
 
 export async function POST(request: Request) {
   try {
@@ -24,26 +22,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'File too large. Maximum size is 5MB.' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
     // Create unique filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    // Get file extension
     const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${uniqueSuffix}.${ext}`;
+    const filename = `uploads/${uniqueSuffix}.${ext}`;
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
+    const blob = await put(filename, file, {
+      access: 'public',
+    });
 
-    // Ensure upload directory exists
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
-
-    return NextResponse.json({ success: true, url: `/uploads/${filename}` });
+    return NextResponse.json({ success: true, url: blob.url });
   } catch (error) {
     console.error('Error saving file:', error);
     return NextResponse.json({ success: false, message: 'Error saving file' }, { status: 500 });

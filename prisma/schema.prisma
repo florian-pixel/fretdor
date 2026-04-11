@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -61,8 +61,8 @@ model Vehicle {
   registrationNumber String
 
   firstRegistrationDate     DateTime? // Date de première mise en circulation
-  trailerRegistrationNumber String?   // Immatriculation de la remorque
-  color                     String?   // Couleur du véhicule
+  trailerRegistrationNumber String? // Immatriculation de la remorque
+  color                     String? // Couleur du véhicule
 
   // Capacity (Mutually exclusive or both)
   capacityWeight Float? // in Tonnes
@@ -92,10 +92,10 @@ model Vehicle {
   isAvailable Boolean @default(true)
 
   // Documents
-  assuranceDocUrl      String? // Assurance
+  assuranceDocUrl       String? // Assurance
   visiteTechniqueDocUrl String? // Visite technique
-  carteGriseDocUrl     String? // Carte grise
-  patenteDocUrl        String? // Patente
+  carteGriseDocUrl      String? // Carte grise
+  patenteDocUrl         String? // Patente
 
   // Photos par côté
   photoFrontUrl String? // Photo avant
