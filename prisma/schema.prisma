@@ -1,0 +1,256 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  name     String
+  role     String @default("AFFRETEUR") // ADMIN, FRETEUR, AFFRETEUR
+
+  entityType String  @default("INDIVIDUAL") // INDIVIDUAL, COMPANY
+  rccm       String? // Numéro RCCM pour Entreprise
+  rccmDocUrl String? // Upload du document RCCM
+  cin        String? // Numéro CIN / Passeport pour Particulier
+  cinDocUrl  String? // Upload du document CIN/Passeport
+
+  phone           String?
+  address         String?
+  avatarUrl       String?
+  isVerified      Boolean @default(false) // Statut de vérification KYC
+  isSuspended     Boolean @default(false) // Compte suspendu par admin
+  suspendedReason String? // Raison de la suspension
+  isBanned        Boolean @default(false) // Compte banni définitivement
+  bannedReason    String? // Raison du bannissement
+
+  // Informations bancaires pour les paiements Split (Fréteurs)
+  bankCode               String? // Code banque Paystack
+  bankName               String? // Nom de la banque
+  accountNumber          String? // Numéro de compte
+  accountName            String? // Nom du titulaire du compte
+  paystackSubaccountCode String? // Code subaccount Paystack
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicles        Vehicle[]
+  bookings        Booking[]     @relation("AffreteurBookings")
+  negotiations    Negotiation[]
+  reviewsGiven    Review[]      @relation("ReviewsGiven")
+  reviewsReceived Review[]      @relation("ReviewsReceived")
+  reportsCreated  Report[]      @relation("ReportsCreated")
+  adminActions    AdminAction[] @relation("AdminActions")
+}
+
+model Vehicle {
+  id                 String @id @default(cuid())
+  ownerId            String
+  owner              User   @relation(fields: [ownerId], references: [id])
+  type               String // Benne, Plateau, Citerne, Frigo, Bâché
+  brand              String
+  model              String
+  registrationNumber String
+
+  firstRegistrationDate     DateTime? // Date de première mise en circulation
+  trailerRegistrationNumber String?   // Immatriculation de la remorque
+  color                     String?   // Couleur du véhicule
+
+  // Capacity (Mutually exclusive or both)
+  capacityWeight Float? // in Tonnes
+  capacityVolume Float? // in m3
+
+  // Features
+  isOffRoadCapable Boolean @default(false) // Piste autorisée
+  hasDriver        Boolean @default(true)
+  hasConvoyeur     Boolean @default(false) // Convoyeur inclus
+  fuelType         String? // Diesel, Essence
+  transmission     String? // Manuelle, Automatique
+
+  location String
+
+  // Pricing
+  pricingType     String @default("PER_TONNE_KM") // PER_DAY, PER_KM, PER_TONNE_KM
+  pricePerDay     Float?
+  pricePerKm      Float?
+  pricePerTonneKm Float? // Prix par tonne-kilomètre (FCFA)
+
+  // Price floor/ceiling (set by fréteur)
+  minPrice Float? // Prix plancher
+  maxPrice Float? // Prix plafond
+
+  conditions String? // Text description of conditions
+
+  isAvailable Boolean @default(true)
+
+  // Documents
+  assuranceDocUrl      String? // Assurance
+  visiteTechniqueDocUrl String? // Visite technique
+  carteGriseDocUrl     String? // Carte grise
+  patenteDocUrl        String? // Patente
+
+  // Photos par côté
+  photoFrontUrl String? // Photo avant
+  photoRearUrl  String? // Photo arrière
+  photoLeftUrl  String? // Photo gauche
+  photoRightUrl String? // Photo droite
+
+  // Images
+  images   VehicleImage[]
+  imageUrl String? // Keep for backward compatibility or main image
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings         Booking[]
+  externalBookings ExternalBooking[]
+}
+
+model VehicleImage {
+  id        String   @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  affreteurId   String
+  affreteur     User     @relation("AffreteurBookings", fields: [affreteurId], references: [id])
+  startDate     DateTime
+  endDate       DateTime
+  startLocation String
+  endLocation   String
+  status        String   @default("PENDING") // PENDING, NEGOTIATING, ACCEPTED, REJECTED, CANCELLED, PAID, COMPLETED
+
+  // Pricing
+  numberOfDays Int // Number of days for the booking
+  pricePerDay  Float // Price per day at time of booking
+  initialPrice Float // Total price proposed by affreteur (pricePerDay × numberOfDays)
+  agreedPrice  Float? // Final agreed price after negotiation
+
+  // Budget range declared by affréteur
+  minBudget Float? // Prix plancher affréteur
+  maxBudget Float? // Prix plafond affréteur
+
+  // Payment
+  paymentReference String? // Paystack payment reference
+  paymentStatus    String? // PENDING, PAID, FAILED
+  paidAt           DateTime?
+
+  // Commission (calculated when booking is confirmed)
+  commissionRate   Float? // Commission rate at time of booking (%)
+  commissionAmount Float? // Commission amount in FCFA
+  netAmount        Float? // Amount to be paid to freteur (agreedPrice - commissionAmount)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  negotiations Negotiation[]
+  reviews      Review[]
+}
+
+model Negotiation {
+  id         String   @id @default(cuid())
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  proposerId String
+  proposer   User     @relation(fields: [proposerId], references: [id])
+  price      Float
+  createdAt  DateTime @default(now())
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  reviewerId String
+  reviewer   User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  revieweeId String
+  reviewee   User     @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  rating     Int // 1-5 stars
+  comment    String?
+  createdAt  DateTime @default(now())
+}
+
+// ===== MODERATION MODELS =====
+
+model Report {
+  id           String    @id @default(cuid())
+  reporterId   String
+  reporter     User      @relation("ReportsCreated", fields: [reporterId], references: [id])
+  reportedType String // USER, VEHICLE, REVIEW, BOOKING
+  reportedId   String // ID of the reported entity
+  reason       String // FRAUD, INAPPROPRIATE, SPAM, FAKE_DOCUMENTS, OTHER
+  description  String?
+  status       String    @default("PENDING") // PENDING, REVIEWED, RESOLVED, DISMISSED
+  adminNotes   String?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model AdminAction {
+  id         String   @id @default(cuid())
+  adminId    String
+  admin      User     @relation("AdminActions", fields: [adminId], references: [id])
+  actionType String // VERIFY_USER, SUSPEND_USER, BAN_USER, UNSUSPEND_USER, RESOLVE_REPORT, DELETE_CONTENT, WARNING
+  targetType String // USER, VEHICLE, REVIEW, BOOKING, REPORT
+  targetId   String
+  reason     String?
+  createdAt  DateTime @default(now())
+}
+
+// ===== EXTERNAL BOOKINGS (Locations hors application) =====
+
+model ExternalBooking {
+  id            String   @id @default(cuid())
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  startDate     DateTime
+  endDate       DateTime
+  startLocation String // Point de départ
+  endLocation   String // Point d'arrivée (où le véhicule sera disponible après)
+  description   String? // Notes optionnelles (ex: "Location pour chantier BTP")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ===== PLATFORM SETTINGS =====
+
+model PlatformSettings {
+  id                String   @id @default("default")
+  commissionRate    Float    @default(0) // Percentage (0-100), e.g., 1 means 1%
+  commissionEnabled Boolean  @default(false) // Whether to apply commission
+  minimumCommission Float    @default(0) // Minimum commission amount in FCFA
+  maximumCommission Float? // Maximum commission amount (null = no limit)
+  updatedAt         DateTime @updatedAt
+  updatedBy         String? // Admin who last updated
+}
+
+// ===== NOTIFICATIONS =====
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // BOOKING_REQUEST, BOOKING_ACCEPTED, BOOKING_REJECTED, NEGOTIATION, BOOKING_COMPLETED, REVIEW_RECEIVED, SYSTEM
+  title     String
+  message   String
+  link      String? // URL to redirect when clicked
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
