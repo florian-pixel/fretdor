@@ -73,7 +73,7 @@ export default function AddVehiclePage() {
     } catch {
       return null;
     } finally {
-      setUploading(null);
+      setUploading(null); // s'exécute TOUJOURS, succès ou échec
     }
   };
 

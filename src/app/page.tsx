@@ -49,7 +49,7 @@ export default function Home() {
               </h1>
 
               <p className="text-xl text-blue-100 mb-8 leading-relaxed max-w-xl">
-                FRETDOR connecte <strong className="text-white">affréteurs</strong> et <strong className="text-white">transporteurs</strong>
+                FRETDOR connecte <strong className="text-white">affréteurs</strong> et <strong className="text-white">transporteurs </strong>
                 pour réduire les trajets à vide et maximiser la rentabilité de chaque course.
               </p>
 

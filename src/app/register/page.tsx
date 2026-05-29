@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
-import { Truck, User, Building2, Upload, FileText } from 'lucide-react';
+import { Truck, User, Building2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const { login } = useAuth();
@@ -17,29 +17,8 @@ export default function RegisterPage() {
     rccm: '',
     cin: '',
   });
-  const [rccmFile, setRccmFile] = useState<File | null>(null);
-  const [cinFile, setCinFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const uploadDocument = async (file: File): Promise<string | null> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return data.url;
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,25 +26,10 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Upload documents if provided
-      let rccmDocUrl = null;
-      let cinDocUrl = null;
-
-      if (rccmFile) {
-        rccmDocUrl = await uploadDocument(rccmFile);
-      }
-      if (cinFile) {
-        cinDocUrl = await uploadDocument(cinFile);
-      }
-
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          rccmDocUrl,
-          cinDocUrl,
-        }),
+        body: JSON.stringify(formData),
       });
       const data = await res.json();
       if (res.ok) {
@@ -192,77 +156,35 @@ export default function RegisterPage() {
 
             {/* Conditional Fields */}
             {formData.entityType === 'COMPANY' ? (
-              <>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Numéro RCCM</label>
-                  <input
-                    type="text"
-                    value={formData.rccm}
-                    onChange={(e) => setFormData({ ...formData, rccm: e.target.value })}
-                    className="block w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                    required
-                    placeholder="Ex: CG-BZV-01-2023-B12345"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    <FileText className="inline h-4 w-4 mr-1" />
-                    Document RCCM (PDF, Image)
-                  </label>
-                  <div className="mt-1 flex items-center">
-                    <label className="flex-1 flex items-center justify-center px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 transition bg-slate-50">
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => setRccmFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                      <Upload className="h-5 w-5 text-slate-400 mr-2" />
-                      <span className="text-sm text-slate-600">
-                        {rccmFile ? rccmFile.name : 'Cliquez pour téléverser le RCCM'}
-                      </span>
-                    </label>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Formats acceptés: PDF, JPG, PNG (max 5MB)</p>
-                </div>
-              </>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Numéro RCCM</label>
+                <input
+                  type="text"
+                  value={formData.rccm}
+                  onChange={(e) => setFormData({ ...formData, rccm: e.target.value })}
+                  className="block w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  placeholder="Ex: CG-BZV-01-2023-B12345"
+                />
+              </div>
             ) : (
-              <>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Numéro CNI / Passeport</label>
-                  <input
-                    type="text"
-                    value={formData.cin}
-                    onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
-                    className="block w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                    required
-                    placeholder="Ex: CI0012345678"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    <FileText className="inline h-4 w-4 mr-1" />
-                    Document d&apos;identité (CNI ou Passeport)
-                  </label>
-                  <div className="mt-1 flex items-center">
-                    <label className="flex-1 flex items-center justify-center px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 transition bg-slate-50">
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => setCinFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                      <Upload className="h-5 w-5 text-slate-400 mr-2" />
-                      <span className="text-sm text-slate-600">
-                        {cinFile ? cinFile.name : 'Cliquez pour téléverser votre pièce d\'identité'}
-                      </span>
-                    </label>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Formats acceptés: PDF, JPG, PNG (max 5MB)</p>
-                </div>
-              </>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Numéro CNI / Passeport</label>
+                <input
+                  type="text"
+                  value={formData.cin}
+                  onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
+                  className="block w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  placeholder="Ex: CI0012345678"
+                />
+              </div>
             )}
           </div>
+
+          <p className="text-xs text-slate-500 text-center">
+            Les documents justificatifs (RCCM, CNI) pourront être uploadés depuis votre espace personnel après inscription.
+          </p>
 
           <button
             type="submit"
