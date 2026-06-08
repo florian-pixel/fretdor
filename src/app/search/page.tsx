@@ -30,7 +30,7 @@ interface Vehicle {
   isOffRoadCapable: boolean;
   hasDriver: boolean;
   fuelType: string | null;
-  imageUrl: string | null;
+  photoFrontUrl: string | null;
   conditions: string | null;
   minPrice: number | null;
   maxPrice: number | null;
@@ -196,8 +196,8 @@ export default function SearchPage() {
               <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
                 {/* Image placeholder */}
                 <div className="aspect-video bg-linear-to-br from-slate-100 to-slate-200 relative overflow-hidden">
-                  {vehicle.imageUrl ? (
-                    <img src={vehicle.imageUrl} alt={`${vehicle.brand} ${vehicle.model}`} className="w-full h-full object-cover" />
+                  {vehicle.photoFrontUrl ? (
+                    <img src={vehicle.photoFrontUrl} alt={`${vehicle.brand} ${vehicle.model}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Truck className="h-16 w-16 text-slate-300" />

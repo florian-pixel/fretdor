@@ -17,7 +17,7 @@ interface Vehicle {
   pricePerDay: number;
   pricePerKm: number | null;
   pricingType: string;
-  imageUrl: string | null;
+  photoFrontUrl: string | null;
 }
 
 interface Stats {
@@ -161,8 +161,8 @@ export default function VehiclesPage() {
             <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
               {/* Image */}
               <div className="aspect-video bg-linear-to-br from-slate-100 to-slate-200 relative">
-                {vehicle.imageUrl ? (
-                  <img src={vehicle.imageUrl} alt={`${vehicle.brand} ${vehicle.model}`} className="w-full h-full object-cover" />
+                {vehicle.photoFrontUrl ? (
+                  <img src={vehicle.photoFrontUrl} alt={`${vehicle.brand} ${vehicle.model}`} className="w-full h-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Truck className="h-12 w-12 text-slate-300" />

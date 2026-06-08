@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
+import { put } from '@vercel/blob';
 import path from 'path';
 
 export async function POST(request: Request) {
@@ -27,12 +28,27 @@ export async function POST(request: Request) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = file.name.split('.').pop() || 'jpg';
     const filename = `${uniqueSuffix}.${ext}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
 
     // ✅ Remplacé : écriture locale au lieu de Vercel Blob
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadDir, { recursive: true });
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(uploadDir, filename), buffer);
+    // const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    // await mkdir(uploadDir, { recursive: true });
+    // const buffer = Buffer.from(await file.arrayBuffer());
+    // await writeFile(path.join(uploadDir, filename), buffer);
+
+    let url: string;
+
+    if (process.env.STORAGE === 'vercel') {
+      // Production : Vercel Blob
+      const blob = await put(filename, buffer, { access: 'public' });
+      url = blob.url;
+    } else {
+      // Local : public/uploads
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+      await mkdir(uploadDir, { recursive: true });
+      await writeFile(path.join(uploadDir, filename), buffer);
+      url = `/uploads/${filename}`;
+    }
 
     return NextResponse.json({ success: true, url: `/uploads/${filename}` });
   } catch (error) {
