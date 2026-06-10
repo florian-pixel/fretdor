@@ -7,6 +7,7 @@ import { Truck, MapPin, Filter, Fuel, Users, Search, ChevronDown, FileText, Cale
 import BookingModal from '@/components/BookingModal';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import Link from 'next/link';
 
 interface BookedDate {
   startDate: string;
@@ -193,7 +194,7 @@ export default function SearchPage() {
           <p className="text-sm text-slate-500">{vehicles.length} véhicule(s) trouvé(s)</p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {vehicles.map((vehicle) => (
-              <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
+              <Link href={`/search/${vehicle.id}`} key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
                 {/* Image placeholder */}
                 <div className="aspect-video bg-linear-to-br from-slate-100 to-slate-200 relative overflow-hidden">
                   {vehicle.photoFrontUrl ? (
@@ -234,7 +235,9 @@ export default function SearchPage() {
                   <div className="flex gap-2 mb-4">
                     {vehicle.conditions && (
                       <button
-                        onClick={() => setViewingConditions(vehicle)}
+                        onClick={(e) => {
+                          e.preventDefault(); setViewingConditions(vehicle)
+                        }}
                         className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
                       >
                         <FileText size={14} />
@@ -242,7 +245,7 @@ export default function SearchPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => fetchBookedDates(vehicle)}
+                      onClick={(e) => {e.preventDefault(); fetchBookedDates(vehicle)}}
                       className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition"
                     >
                       <Calendar size={14} />
@@ -269,7 +272,7 @@ export default function SearchPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </>
@@ -367,11 +370,10 @@ export default function SearchPage() {
                             {format(new Date(date.endDate), 'dd MMM yyyy', { locale: fr })}
                           </span>
                         </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          date.type === 'external'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-orange-100 text-orange-700'
-                        }`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${date.type === 'external'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-orange-100 text-orange-700'
+                          }`}>
                           {date.type === 'external' ? 'Hors appli' : 'Réservé'}
                         </span>
                       </div>
