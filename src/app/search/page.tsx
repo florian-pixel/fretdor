@@ -245,7 +245,7 @@ export default function SearchPage() {
                       </button>
                     )}
                     <button
-                      onClick={(e) => {e.preventDefault(); fetchBookedDates(vehicle)}}
+                      onClick={(e) => { e.preventDefault(); fetchBookedDates(vehicle) }}
                       className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition"
                     >
                       <Calendar size={14} />
@@ -265,7 +265,7 @@ export default function SearchPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => setSelectedVehicle(vehicle)}
+                      onClick={(e) => { e.preventDefault(); setSelectedVehicle(vehicle) }}
                       className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition shadow-sm"
                     >
                       Réserver
@@ -402,7 +402,8 @@ export default function SearchPage() {
             </div>
             <div className="p-5 border-t border-slate-100">
               <button
-                onClick={() => {
+                onClick={(e) => {
+
                   setViewingDates(null);
                   setSelectedVehicle(viewingDates.vehicle);
                 }}
