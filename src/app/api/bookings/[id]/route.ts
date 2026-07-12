@@ -167,3 +167,45 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Error updating booking' }, { status: 500 });
   }
 }
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: {
+        vehicle: {
+          include: { owner: true },
+        },
+        affreteur: true,
+        negotiations: {
+          orderBy: { createdAt: 'desc' },
+        },
+        reviews: true,
+      },
+    });
+
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    // Vérifier que l'utilisateur a accès à cette réservation
+    const isOwner = booking.vehicle.ownerId === session.user.id;
+    const isAffreteur = booking.affreteurId === session.user.id;
+
+    if (!isOwner && !isAffreteur && session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    return NextResponse.json(booking);
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    return NextResponse.json({ error: 'Error fetching booking' }, { status: 500 });
+  }
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Calendar, MapPin, Phone, Mail, Clock, CheckCircle, XCircle, MessageSquare, Star, Check, CreditCard, Loader2 } from 'lucide-react';
@@ -311,6 +311,9 @@ export default function BookingList({ role, userId }: { role: string, userId: st
     }
   };
 
+
+  const router = useRouter();
+
   const hasReviewed = (booking: Booking) => {
     return booking.reviews?.some(r => r.reviewerId === userId);
   };
@@ -339,11 +342,10 @@ export default function BookingList({ role, userId }: { role: string, userId: st
     <div className="space-y-4">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-100 max-w-sm p-4 rounded-lg shadow-lg border animate-in slide-in-from-top-2 ${
-          toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+        <div className={`fixed top-4 right-4 z-100 max-w-sm p-4 rounded-lg shadow-lg border animate-in slide-in-from-top-2 ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
           toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-          'bg-blue-50 border-blue-200 text-blue-800'
-        }`}>
+            'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
           <div className="flex items-start gap-3">
             {toast.type === 'success' && <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />}
             {toast.type === 'error' && <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />}
@@ -383,9 +385,9 @@ export default function BookingList({ role, userId }: { role: string, userId: st
           <div
             key={booking.id}
             ref={isHighlighted ? highlightRef : null}
-            className={`bg-white border ${status.border} rounded-xl overflow-hidden transition-all hover:shadow-md ${
-              isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2 shadow-lg animate-pulse' : ''
-            }`}
+            onClick={() => router.push(`/bookings/${booking.id}`)}
+            className={`bg-white border ${status.border} rounded-xl overflow-hidden transition-all hover:shadow-md cursor-pointer ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2 shadow-lg animate-pulse' : ''
+              }`}
           >
             <div className="p-5">
               <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
@@ -628,11 +630,10 @@ export default function BookingList({ role, userId }: { role: string, userId: st
                     className="focus:outline-none"
                   >
                     <Star
-                      className={`h-8 w-8 transition-colors ${
-                        star <= reviewRating
-                          ? 'text-yellow-400 fill-current'
-                          : 'text-slate-300'
-                      }`}
+                      className={`h-8 w-8 transition-colors ${star <= reviewRating
+                        ? 'text-yellow-400 fill-current'
+                        : 'text-slate-300'
+                        }`}
                     />
                   </button>
                 ))}
@@ -697,22 +698,20 @@ export default function BookingList({ role, userId }: { role: string, userId: st
                 <div className="flex gap-2">
                   <button
                     onClick={() => setPaymentMethod('card')}
-                    className={`flex-1 p-3 rounded-lg border-2 text-sm font-medium transition ${
-                      paymentMethod === 'card'
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
+                    className={`flex-1 p-3 rounded-lg border-2 text-sm font-medium transition ${paymentMethod === 'card'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
                   >
                     <CreditCard className="h-5 w-5 mx-auto mb-1" />
                     Carte bancaire
                   </button>
                   <button
                     onClick={() => setPaymentMethod('momo')}
-                    className={`flex-1 p-3 rounded-lg border-2 text-sm font-medium transition ${
-                      paymentMethod === 'momo'
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
+                    className={`flex-1 p-3 rounded-lg border-2 text-sm font-medium transition ${paymentMethod === 'momo'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
                   >
                     <Phone className="h-5 w-5 mx-auto mb-1" />
                     Mobile Money
@@ -731,21 +730,19 @@ export default function BookingList({ role, userId }: { role: string, userId: st
                     <div className="flex gap-2">
                       <button
                         onClick={() => setMomoProvider('orange')}
-                        className={`flex-1 p-2 rounded-lg border-2 text-xs font-medium transition ${
-                          momoProvider === 'orange'
-                            ? 'border-orange-500 bg-orange-50 text-orange-700'
-                            : 'border-slate-200 text-slate-600'
-                        }`}
+                        className={`flex-1 p-2 rounded-lg border-2 text-xs font-medium transition ${momoProvider === 'orange'
+                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          : 'border-slate-200 text-slate-600'
+                          }`}
                       >
                         Orange Money
                       </button>
                       <button
                         onClick={() => setMomoProvider('mtn')}
-                        className={`flex-1 p-2 rounded-lg border-2 text-xs font-medium transition ${
-                          momoProvider === 'mtn'
-                            ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                            : 'border-slate-200 text-slate-600'
-                        }`}
+                        className={`flex-1 p-2 rounded-lg border-2 text-xs font-medium transition ${momoProvider === 'mtn'
+                          ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                          : 'border-slate-200 text-slate-600'
+                          }`}
                       >
                         MTN MoMo
                       </button>
