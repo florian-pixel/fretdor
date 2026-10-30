@@ -13,6 +13,7 @@ interface Booking {
     brand: string;
     model: string;
     registrationNumber: string;
+    pricePerTonneKm?: number | null;
     ownerId: string;
     owner?: {
       id: string;
@@ -35,6 +36,8 @@ interface Booking {
   paymentStatus?: string;
   numberOfDays: number;
   pricePerDay: number;
+  distanceKm?: number | null;
+  tonnage?: number | null;
   initialPrice: number;
   agreedPrice: number | null;
   // Commission fields
@@ -367,6 +370,11 @@ export default function BookingList({ role, userId }: { role: string, userId: st
         const lastProposerId = lastNegotiation ? lastNegotiation.proposerId : booking.affreteurId;
         const isMyTurn = lastProposerId !== userId;
         const isFinal = ['ACCEPTED', 'CONFIRMED', 'COMPLETED', 'PAID', 'REJECTED', 'CANCELLED'].includes(booking.status);
+        const tarif = booking.vehicle.pricePerTonneKm ?? 0;
+        const hasTonneKm = !!(booking.distanceKm && booking.tonnage && tarif);
+        const computedTotal = hasTonneKm
+          ? Math.round(booking.distanceKm! * booking.tonnage! * tarif)
+          : null;
 
         const statusConfig = {
           PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'En attente' },
@@ -504,8 +512,8 @@ export default function BookingList({ role, userId }: { role: string, userId: st
                   {/* For Affréteur: show total amount */}
                   {role === 'AFFRETEUR' && (
                     <>
-                      <p className="text-xs text-slate-500 mb-1">Montant total</p>
-                      <p className="text-2xl font-bold text-slate-900">{(booking.agreedPrice || currentPrice).toLocaleString()} <span className="text-sm font-normal">FCFA</span></p>
+                      <p className="text-xs text-slate-500 mb-1">Montant initial</p>
+                      <p className="text-xl font-bold text-slate-900">{(booking.agreedPrice || currentPrice).toLocaleString()} <span className="text-sm font-normal">FCFA</span></p>
                     </>
                   )}
 
@@ -525,10 +533,18 @@ export default function BookingList({ role, userId }: { role: string, userId: st
                     </>
                   )}
 
-                  {booking.numberOfDays && booking.pricePerDay && (
-                    <p className="text-xs text-slate-400 mt-1">
-                      {booking.pricePerDay.toLocaleString()} FCFA × {booking.numberOfDays} jour{booking.numberOfDays > 1 ? 's' : ''}
-                    </p>
+                  {hasTonneKm ? (
+                    <div className="mt-2 text-xs text-slate-400 space-y-0.5">
+                      <p className="font-semibold text-blue-500">
+                        Montant total: {computedTotal!.toLocaleString()} FCFA
+                      </p>
+                    </div>
+                    ) : (
+                    booking.numberOfDays && booking.pricePerDay > 0 && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        {booking.pricePerDay.toLocaleString()} FCFA × {booking.numberOfDays} jour{booking.numberOfDays > 1 ? 's' : ''}
+                      </p>
+                    )
                   )}
                 </div>
               </div>

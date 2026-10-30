@@ -14,7 +14,7 @@ interface Vehicle {
   type: string;
   location: string;
   isAvailable: boolean;
-  pricePerDay: number;
+  pricePerTonneKm: number;
   pricePerKm: number | null;
   pricingType: string;
   photoFrontUrl: string | null;
@@ -194,7 +194,7 @@ export default function VehiclesPage() {
                       {vehicle.pricingType === 'PER_KM' && vehicle.pricePerKm ? (
                         <>{vehicle.pricePerKm.toLocaleString()} <span className="text-sm font-normal text-slate-500">FCFA/km</span></>
                       ) : (
-                        <>{vehicle.pricePerDay?.toLocaleString()} <span className="text-sm font-normal text-slate-500">FCFA/jour</span></>
+                        <>{vehicle.pricePerTonneKm?.toLocaleString()} <span className="text-sm font-normal text-slate-500">FCFA/tonne-Km</span></>
                       )}
                     </p>
                   </div>

@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const location = searchParams.get('location');
   const isOffRoadCapable = searchParams.get('isOffRoadCapable');
   const ownerId = searchParams.get('ownerId');
+  const priceMaxParam = searchParams.get('priceMaxPerTonneKm');
 
   const where: any = {
     isAvailable: true,
@@ -19,6 +20,19 @@ export async function GET(request: Request) {
   if (ownerId) {
     where.ownerId = ownerId;
     delete where.isAvailable; // Owner can see all their vehicles
+  }
+
+  // Fourchette de prix de l'expéditeur vs prix plancher du transporteur (FCFA/tonne-Km).
+  // Le transporteur ne fixe qu'un plancher (minPrice) — pas de plafond.
+  // Le véhicule ne s'affiche que si le maximum proposé par l'expéditeur couvre ce plancher.
+  // Si le véhicule n'a pas de minPrice défini, on retombe sur pricePerTonneKm.
+  const shipperMax = priceMaxParam ? parseFloat(priceMaxParam) : null;
+
+  if (shipperMax !== null) {
+    where.OR = [
+      { minPrice: { lte: shipperMax } },
+      { minPrice: null, pricePerTonneKm: { lte: shipperMax } },
+    ];
   }
 
   try {
@@ -76,8 +90,8 @@ export async function POST(request: Request) {
         transmission,
         location,
         pricingType,
-        pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
-        pricePerKm: pricePerKm ? parseFloat(pricePerKm) : null,
+        // pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
+        // pricePerKm: pricePerKm ? parseFloat(pricePerKm) : null,
         pricePerTonneKm: pricePerTonneKm ? parseFloat(pricePerTonneKm) : null,
         minPrice: minPrice ? parseFloat(minPrice) : null,
         maxPrice: maxPrice ? parseFloat(maxPrice) : null,

@@ -131,6 +131,8 @@ model Booking {
   endDate       DateTime
   startLocation String
   endLocation   String
+  distanceKm   Float? // Distance du trajet calculée par la carte
+  tonnage      Float? // Tonnage transporté (T)
   status        String   @default("PENDING") // PENDING, NEGOTIATING, ACCEPTED, REJECTED, CANCELLED, PAID, COMPLETED
 
   // Pricing

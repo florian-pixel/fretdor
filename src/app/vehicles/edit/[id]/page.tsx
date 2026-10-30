@@ -461,7 +461,6 @@ export default function EditVehiclePage({ params }: { params: Promise<{ id: stri
             <div className="flex flex-wrap gap-3">
               {[
                 { value: 'PER_TONNE_KM', label: 'Par Tonne-Km' },
-                { value: 'PER_DAY', label: 'Par Jour' },
                 { value: 'PER_KM', label: 'Par Kilomètre' },
               ].map(({ value, label }) => (
                 <button
@@ -508,19 +507,6 @@ export default function EditVehiclePage({ params }: { params: Promise<{ id: stri
             </div>
           )}
 
-          {formData.pricingType === 'PER_DAY' && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Prix par jour (FCFA)</label>
-              <input
-                type="number"
-                required
-                placeholder="Ex: 150 000"
-                className="w-full border-slate-300 rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.pricePerDay}
-                onChange={(e) => setFormData({ ...formData, pricePerDay: e.target.value })}
-              />
-            </div>
-          )}
 
           {formData.pricingType === 'PER_KM' && (
             <div className="mb-6">
@@ -537,7 +523,7 @@ export default function EditVehiclePage({ params }: { params: Promise<{ id: stri
           )}
 
           <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <p className="text-sm font-semibold text-slate-700 mb-3">Prix plancher & plafond (optionnel)</p>
+            <p className="text-sm font-semibold text-slate-700 mb-3">Prix plancher</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">Prix plancher (FCFA)</label>
@@ -549,7 +535,7 @@ export default function EditVehiclePage({ params }: { params: Promise<{ id: stri
                   onChange={(e) => setFormData({ ...formData, minPrice: e.target.value })}
                 />
               </div>
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">Prix plafond (FCFA)</label>
                 <input
                   type="number"
@@ -558,9 +544,9 @@ export default function EditVehiclePage({ params }: { params: Promise<{ id: stri
                   value={formData.maxPrice}
                   onChange={(e) => setFormData({ ...formData, maxPrice: e.target.value })}
                 />
-              </div>
+              </div> */}
             </div>
-            <p className="text-xs text-slate-500 mt-2">Ces prix guident la négociation mais ne sont pas visibles publiquement.</p>
+            <p className="text-xs text-slate-500 mt-2">Ce prix guide la négociation mais n'est visible publiquement.</p>
           </div>
 
           <div className="mt-6">
