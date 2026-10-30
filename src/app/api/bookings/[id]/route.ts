@@ -33,7 +33,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const body = await request.json();
-    const { action, price } = body; // action: 'accept', 'reject', 'negotiate', 'complete'
+    const { action, price } = body; // action: 'accept', 'reject', 'negotiate', 'complete', 'cancel', 'update'
 
     if (action === 'negotiate') {
       if (!price) return NextResponse.json({ error: 'Price required for negotiation' }, { status: 400 });
@@ -63,9 +63,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         id
       );
     } else if (action === 'accept') {
-      // If accepting, we need to know which price is accepted. Usually the last one.
-      // Or if the user just clicks "Accept", it means they accept the last offer.
-      // Let's fetch the last negotiation to get the price.
       const lastNegotiation = await prisma.negotiation.findFirst({
         where: { bookingId: id },
         orderBy: { createdAt: 'desc' },
@@ -80,15 +77,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       });
 
       if (settings && settings.commissionEnabled && settings.commissionRate > 0) {
-        // Calculate commission
         let commissionAmount = (finalPrice * settings.commissionRate) / 100;
 
-        // Apply minimum commission
         if (settings.minimumCommission > 0) {
           commissionAmount = Math.max(commissionAmount, settings.minimumCommission);
         }
 
-        // Apply maximum commission
         if (settings.maximumCommission !== null) {
           commissionAmount = Math.min(commissionAmount, settings.maximumCommission);
         }
@@ -158,12 +152,64 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const vehicleName = `${booking.vehicle.brand} ${booking.vehicle.model}`;
       await notifications.bookingCompleted(booking.affreteurId, vehicleName, id);
       await notifications.bookingCompleted(booking.vehicle.ownerId, vehicleName, id);
+    } else if (action === 'cancel') {
+      if (!['PENDING', 'NEGOTIATING', 'CONFIRMED', 'ACCEPTED'].includes(booking.status)) {
+        return NextResponse.json({ error: 'Cette réservation ne peut plus être annulée' }, { status: 400 });
+      }
+
+      await prisma.booking.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+      });
+    } else if (action === 'update') {
+      // Seul l'affréteur propriétaire de la réservation peut la modifier
+      if (!isAffreteur) {
+        return NextResponse.json({ error: "Seul l'affréteur peut modifier cette réservation" }, { status: 403 });
+      }
+
+      if (booking.status !== 'PENDING') {
+        return NextResponse.json({ error: 'Modification possible uniquement avant toute négociation' }, { status: 400 });
+      }
+
+      const { startDate, endDate, startLocation, endLocation, minBudget, maxBudget } = body;
+
+      if (!startDate || !endDate || !startLocation?.trim() || !endLocation?.trim()) {
+        return NextResponse.json({ error: 'Dates et lieux obligatoires' }, { status: 400 });
+      }
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
+        return NextResponse.json({ error: 'Dates invalides' }, { status: 400 });
+      }
+
+      if (minBudget != null && maxBudget != null && Number(minBudget) > Number(maxBudget)) {
+        return NextResponse.json({ error: 'Budget minimum supérieur au maximum' }, { status: 400 });
+      }
+
+      // Recalcul côté serveur : on ne fait pas confiance au client pour le prix
+      const numberOfDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+
+      await prisma.booking.update({
+        where: { id },
+        data: {
+          startDate: start,
+          endDate: end,
+          startLocation: startLocation.trim(),
+          endLocation: endLocation.trim(),
+          numberOfDays,
+          initialPrice: numberOfDays * booking.pricePerDay,
+          minBudget: minBudget != null ? Number(minBudget) : null,
+          maxBudget: maxBudget != null ? Number(maxBudget) : null,
+        },
+      });
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('Error updating booking:', error);
     return NextResponse.json({ error: 'Error updating booking' }, { status: 500 });
   }
 }

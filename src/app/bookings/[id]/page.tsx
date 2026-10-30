@@ -8,7 +8,7 @@ import {
   ArrowLeft, Truck, MapPin, Calendar, Clock, User, DollarSign,
   CheckCircle2, XCircle, AlertTriangle, X, MessageSquare,
   CreditCard, TrendingUp, Hash, Star, ChevronRight, Banknote,
-  Package, Navigation, RefreshCw
+  Package, Navigation, RefreshCw, Pencil, Route
 } from 'lucide-react';
 
 interface Vehicle {
@@ -19,6 +19,7 @@ interface Vehicle {
   type: string;
   photoFrontUrl: string | null;
   location: string;
+  pricePerTonneKm: number | null;
 }
 
 interface Affreteur {
@@ -56,6 +57,8 @@ interface Booking {
   status: string;
   numberOfDays: number;
   pricePerDay: number;
+  distanceKm: number | null;
+  tonnage: number | null;
   initialPrice: number;
   agreedPrice: number | null;
   minBudget: number | null;
@@ -106,46 +109,64 @@ export default function BookingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
   }, [user, authLoading, router]);
 
   useEffect(() => {
-  if (user && id) {
-    console.log('fetching booking with id:', id); // 👈
-    fetch(`/api/bookings/${id}`)
-      .then(res => {
-        console.log('response status:', res.status); // 👈
-        return res.json();
-      })
-      .then(data => {
-        console.log('booking data:', data); // 👈
-        setBooking(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('fetch error:', err);
-        setLoading(false);
+  if (!user || !id) return;
+
+  fetch(`/api/bookings/${id}`)
+    .then(async (res) => {
+      const data = await res.json().catch(() => null);
+      console.log('GET booking:', res.status, data);
+
+      if (!res.ok || !data || !data.vehicle) {
+        setBooking(null);
+        return;
+      }
+
+      setBooking({
+        ...data,
+        negotiations: data.negotiations ?? [],
+        reviews: data.reviews ?? [],
       });
-  }
+    })
+    .catch((err) => {
+      console.error('fetch error:', err);
+      setBooking(null);
+    })
+    .finally(() => setLoading(false));
 }, [user, id]);
 
   const cancelBooking = async () => {
     if (!booking) return;
     setCancelling(true);
+    setCancelError(null);
     try {
       const res = await fetch(`/api/bookings/${booking.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CANCELLED' }),
+        body: JSON.stringify({ action: 'cancel' }),
       });
-      if (res.ok) {
-        setBooking({ ...booking, status: 'CANCELLED' });
-        setCancelModal(false);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        console.error('cancel failed:', res.status, data);
+        setCancelError(data?.error || data?.message || `Erreur ${res.status}`);
+        return;
       }
-    } catch (e) { console.error(e); }
-    setCancelling(false);
+
+      setBooking(prev => (prev ? { ...prev, status: 'CANCELLED' } : prev));
+      setCancelModal(false);
+    } catch (e) {
+      console.error(e);
+      setCancelError('Erreur réseau, réessayez.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   if (authLoading || !user || loading) {
@@ -170,6 +191,15 @@ export default function BookingDetailPage() {
 
   const status = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG['PENDING'];
   const canCancel = ['PENDING', 'NEGOTIATING', 'ACCEPTED'].includes(booking.status);
+  const isAffreteur = user.id === booking.affreteurId;
+  const canEdit = isAffreteur && booking.status === 'PENDING';
+
+  // Calcul tonne-km : tarif × tonnage × distance
+  const distanceKm = booking.distanceKm != null ? Number(booking.distanceKm) : null;
+  const tonnage = booking.tonnage != null ? Number(booking.tonnage) : null;
+  const pricePerTonneKm = booking.vehicle.pricePerTonneKm != null ? Number(booking.vehicle.pricePerTonneKm) : null;
+  const computedPrice =
+    distanceKm && tonnage && pricePerTonneKm ? distanceKm * tonnage * pricePerTonneKm : null;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -183,6 +213,14 @@ export default function BookingDetailPage() {
           <ArrowLeft size={18} /> Retour aux réservations
         </Link>
         <div className="flex items-center gap-2">
+          {canEdit && (
+            <Link
+              href={`/bookings/${booking.id}/edit`}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition text-sm font-medium"
+            >
+              <Pencil size={16} /> Modifier
+            </Link>
+          )}
           {canCancel && (
             <button
               onClick={() => setCancelModal(true)}
@@ -222,7 +260,7 @@ export default function BookingDetailPage() {
               <p className="text-white/70 text-sm">{booking.vehicle.registrationNumber} · {booking.vehicle.type}</p>
             </div>
             <Link
-              href={`/vehicles/${booking.vehicleId}`}
+              href={`/search/${booking.vehicleId}`}
               className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition backdrop-blur-sm"
             >
               Voir le véhicule <ChevronRight size={14} />
@@ -289,6 +327,14 @@ export default function BookingDetailPage() {
                 <p className="text-sm font-semibold text-slate-800">{fmt(booking.endDate)}</p>
               </div>
             </div>
+            {distanceKm != null && (
+              <div className="bg-slate-50 rounded-lg px-4 py-3 flex items-center justify-between">
+                <p className="text-sm text-slate-500 flex items-center gap-1.5"><Route size={14} /> Distance</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {distanceKm.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km
+                </p>
+              </div>
+            )}
             <div className="bg-slate-50 rounded-lg px-4 py-3 flex items-center justify-between">
               <p className="text-sm text-slate-500">Durée</p>
               <p className="text-sm font-bold text-slate-800">{booking.numberOfDays} jour{booking.numberOfDays > 1 ? 's' : ''}</p>
@@ -337,8 +383,6 @@ export default function BookingDetailPage() {
             <DollarSign size={18} className="text-green-500" /> Tarification
           </h2>
           <dl className="space-y-3">
-            <PriceRow label="Prix / jour" value={`${booking.pricePerDay.toLocaleString()} FCFA`} />
-            <PriceRow label="Nombre de jours" value={`${booking.numberOfDays} j`} />
             <PriceRow label="Prix initial" value={`${booking.initialPrice.toLocaleString()} FCFA`} />
             {booking.agreedPrice != null && (
               <PriceRow
@@ -348,6 +392,25 @@ export default function BookingDetailPage() {
               />
             )}
           </dl>
+          {computedPrice != null && (
+            <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Calcul au tonne-km</p>
+              <dl className="space-y-2">
+                <PriceRow label="Tarif" value={`${pricePerTonneKm!.toLocaleString()} F/T·km`} muted />
+                <PriceRow label="Tonnage" value={`${tonnage!.toLocaleString()} T`} muted />
+                <PriceRow
+                  label="Distance"
+                  value={`${distanceKm!.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`}
+                  muted
+                />
+                <PriceRow
+                  label="Total calculé"
+                  value={`${Math.round(computedPrice).toLocaleString()} FCFA`}
+                  highlight
+                />
+              </dl>
+            </div>
+          )}
           {booking.commissionRate != null && (
             <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Commission</p>
@@ -473,6 +536,9 @@ export default function BookingDetailPage() {
                     Êtes-vous sûr de vouloir annuler cette réservation ? Cette action est irréversible.
                   </p>
                 </div>
+                {cancelError && (
+                  <p className="mt-3 text-sm text-red-600">{cancelError}</p>
+                )}
               </div>
             </div>
             <div className="p-5 border-t border-slate-100 flex gap-3 justify-end">

@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         }
         if (b.vehicle && b.vehicle.owner) {
            // @ts-ignore
-           b.vehicle.owner = { ...b.vehicle.owner, email: null, phone: null };
+          b.vehicle.owner = { ...b.vehicle.owner, email: null, phone: null };
         }
       }
       return b;
@@ -60,7 +60,20 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { vehicleId, startDate, endDate, startLocation, endLocation, numberOfDays, pricePerDay, initialPrice, minBudget, maxBudget } = body;
+    const {
+      vehicleId,
+      startDate,
+      endDate,
+      startLocation,
+      endLocation,
+      numberOfDays,
+      pricePerDay,
+      initialPrice,
+      minBudget,
+      maxBudget,
+      distanceKm,
+      tonnage,
+    } = body;
 
     // Validate required fields
     if (!vehicleId || !startDate || !endDate || !startLocation || !endLocation || !numberOfDays || !initialPrice) {
@@ -121,6 +134,9 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const parsedDistance = distanceKm != null && distanceKm !== '' ? parseFloat(distanceKm) : NaN;
+    const parsedTonnage = tonnage != null && tonnage !== '' ? parseFloat(tonnage) : NaN;
+
     const booking = await prisma.booking.create({
       data: {
         vehicleId,
@@ -131,6 +147,8 @@ export async function POST(request: Request) {
         endLocation,
         numberOfDays: parseInt(numberOfDays),
         pricePerDay: pricePerDay ? parseFloat(pricePerDay) : 0,
+        distanceKm: Number.isFinite(parsedDistance) && parsedDistance > 0 ? parsedDistance : null,
+        tonnage: Number.isFinite(parsedTonnage) && parsedTonnage > 0 ? parsedTonnage : null,
         initialPrice: parseFloat(initialPrice),
         status: 'PENDING',
         minBudget: minBudget ? parseFloat(minBudget) : null,

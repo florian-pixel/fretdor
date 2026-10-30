@@ -50,6 +50,8 @@ export default function SearchPage() {
     type: '',
     location: '',
     isOffRoadCapable: false,
+    priceMin: '',
+    priceMax: '',
   });
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [viewingConditions, setViewingConditions] = useState<Vehicle | null>(null);
@@ -68,6 +70,8 @@ export default function SearchPage() {
     if (filters.type) params.append('type', filters.type);
     if (filters.location) params.append('location', filters.location);
     if (filters.isOffRoadCapable) params.append('isOffRoadCapable', 'true');
+    if (filters.priceMin) params.append('priceMinPerTonneKm', filters.priceMin);
+    if (filters.priceMax) params.append('priceMaxPerTonneKm', filters.priceMax);
 
     const res = await fetch(`/api/vehicles?${params.toString()}`);
     const data = await res.json();
@@ -155,6 +159,19 @@ export default function SearchPage() {
               />
             </div>
           </div>
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Prix souhaité (FCFA/tonne-Km)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                placeholder="Max"
+                className="w-full border border-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                value={filters.priceMax}
+                onChange={(e) => setFilters({ ...filters, priceMax: e.target.value })}
+              />
+            </div>
+          </div>
           <div className="flex items-end">
             <label className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition w-full">
               <input
@@ -166,15 +183,15 @@ export default function SearchPage() {
               <span className="text-sm text-slate-700">Apte pour piste</span>
             </label>
           </div>
-          <div className="flex items-end">
-            <button
-              onClick={fetchVehicles}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 transition font-medium"
-            >
-              <Search size={18} />
-              Rechercher
-            </button>
-          </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={fetchVehicles}
+            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-medium"
+          >
+            <Search size={18} />
+            Rechercher
+          </button>
         </div>
       </div>
 
@@ -254,16 +271,16 @@ export default function SearchPage() {
                   </div>
 
                   <div className="flex justify-between items-end pt-4 border-t border-slate-100">
-                    <div>
+                    {/* <div>
                       <p className="text-xs text-slate-500">Prix</p>
                       <p className="font-bold text-xl text-slate-900">
-                        {vehicle.pricingType === 'PER_KM' && vehicle.pricePerKm ? (
+                        {vehicle.pricePerKm ? (
                           <>{vehicle.pricePerKm.toLocaleString()} <span className="text-sm font-normal text-slate-500">FCFA/km</span></>
                         ) : (
-                          <>{vehicle.pricePerDay?.toLocaleString()} <span className="text-sm font-normal text-slate-500">FCFA/jour</span></>
+                          <>{vehicle.pricePerTonneKm?.toLocaleString()} <span className="text-sm font-normal text-slate-500">FCFA/tonne-Km</span></>
                         )}
                       </p>
-                    </div>
+                    </div> */}
                     <button
                       onClick={(e) => { e.preventDefault(); setSelectedVehicle(vehicle) }}
                       className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition shadow-sm"

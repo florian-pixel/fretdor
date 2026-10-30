@@ -349,9 +349,6 @@ export default function VehicleDetailPage() {
           </h2>
           <dl className="space-y-3">
             <DetailRow label="Mode de tarif" value={PRICING_LABELS[vehicle.pricingType] ?? vehicle.pricingType} />
-            {vehicle.pricePerDay != null && (
-              <DetailRow label="Prix / jour" value={`${vehicle.pricePerDay.toLocaleString()} FCFA`} />
-            )}
             {vehicle.pricePerKm != null && (
               <DetailRow label="Prix / km" value={`${vehicle.pricePerKm.toLocaleString()} FCFA`} />
             )}

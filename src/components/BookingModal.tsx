@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Calendar, MapPin, Truck, CreditCard, Info, Calculator, Weight } from 'lucide-react';
+import { RouteMap } from './RouteMap';
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
@@ -11,29 +12,92 @@ interface Vehicle {
   brand: string;
   model: string;
   type: string;
-  pricePerDay: number | null;
-  pricePerKm: number | null;
   pricePerTonneKm: number | null;
-  pricingType: string;
   location: string;
   minPrice: number | null;
   maxPrice: number | null;
 }
 
+async function reverseGeocode(lng: number, lat: number): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+    );
+    if (!res.ok) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    const data = await res.json();
+    return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  } catch {
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+}
+
 export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnalysingTrajet, setIsAnalysingTrajet] = useState(false);
+  const [trajetAnalyse, setTrajetAnalyse] = useState<TrajetAnalyse | null>(null);
+  const [routeSegments, setRouteSegments] = useState<TrajetAnalyse['segments'] | null>(null);
+
+  // interface TrajetAnalyse mise à jour
+  interface TrajetAnalyse {
+    km_goudron: number;
+    km_piste_praticable: number;
+    km_piste_degradee: number;
+    a_de_la_piste: boolean;
+    segments: { surface: 'goudron' | 'piste_praticable' | 'piste_degradee'; coordinates: [number, number][] }[];
+  }
   const [formData, setFormData] = useState({
     startDate: '',
     endDate: '',
-    startLocation: vehicle.location || '',
+    startLocation: '',
     endLocation: '',
+    startCoords: null as [number, number] | null,
+    endCoords: null as [number, number] | null,
     customPrice: '',
     tonnage: '',
     distanceKm: '',
     minBudget: '',
     maxBudget: '',
   });
+
+  const handlePointsSelected = useCallback(async (depart: [number, number], arrivee: [number, number]) => {
+    setIsAnalysingTrajet(true);
+    setTrajetAnalyse(null);
+    setRouteSegments(null);
+
+    const [startAddress, endAddress] = await Promise.all([
+      reverseGeocode(depart[0], depart[1]),
+      reverseGeocode(arrivee[0], arrivee[1]),
+    ]);
+
+    setFormData((prev) => ({
+      ...prev,
+      startLocation: startAddress,
+      endLocation: endAddress,
+      startCoords: depart,
+      endCoords: arrivee,
+      distanceKm: '', // on vide en attendant la nouvelle analyse
+    }));
+
+    try {
+      const res = await fetch('/api/journeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ depart, arrivee }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const distanceTotale = data.km_goudron + data.km_piste_praticable + data.km_piste_degradee;
+        setTrajetAnalyse(data);
+        setRouteSegments(data.segments);
+        setFormData((prev) => ({ ...prev, distanceKm: distanceTotale.toFixed(1) }));
+      }
+    } catch (error) {
+      console.error('Erreur analyse trajet', error);
+    } finally {
+      setIsAnalysingTrajet(false);
+    }
+  }, []);
 
   const { numberOfDays, suggestedPrice } = useMemo(() => {
     if (!formData.startDate || !formData.endDate) return { numberOfDays: 0, suggestedPrice: 0 };
@@ -43,17 +107,9 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     if (days <= 0) return { numberOfDays: 0, suggestedPrice: 0 };
 
-    let price = 0;
-    if (vehicle.pricingType === 'PER_DAY') {
-      price = days * (vehicle.pricePerDay || 0);
-    } else if (vehicle.pricingType === 'PER_KM') {
-      const km = parseFloat(formData.distanceKm) || 0;
-      price = km * (vehicle.pricePerKm || 0);
-    } else if (vehicle.pricingType === 'PER_TONNE_KM') {
-      const t = parseFloat(formData.tonnage) || 0;
-      const km = parseFloat(formData.distanceKm) || 0;
-      price = t * km * (vehicle.pricePerTonneKm || 0);
-    }
+    const t = parseFloat(formData.tonnage) || 0;
+    const km = parseFloat(formData.distanceKm) || 0;
+    const price = t * km * (vehicle.pricePerTonneKm || 0);
 
     return { numberOfDays: days, suggestedPrice: price };
   }, [formData.startDate, formData.endDate, formData.tonnage, formData.distanceKm, vehicle]);
@@ -68,6 +124,11 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
       return;
     }
 
+    if (!formData.startCoords || !formData.endCoords) {
+      alert('Veuillez sélectionner le départ et l\'arrivée sur la carte');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch('/api/bookings', {
@@ -79,26 +140,30 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
           endDate: formData.endDate,
           startLocation: formData.startLocation,
           endLocation: formData.endLocation,
+          startCoords: formData.startCoords,
+          endCoords: formData.endCoords,
           numberOfDays,
-          pricePerDay: vehicle.pricePerDay,
+          tonnage: parseFloat(formData.tonnage) || 0,
+          distanceKm: parseFloat(formData.distanceKm) || 0,
           initialPrice: totalPrice,
           minBudget: formData.minBudget ? parseFloat(formData.minBudget) : null,
           maxBudget: formData.maxBudget ? parseFloat(formData.maxBudget) : null,
+          trajetAnalyse,
         }),
       });
       if (res.ok) {
-        onClose();
-        router.push('/dashboard');
-      }
+  onClose();
+  router.push('/dashboard');
+} else {
+  const err = await res.json().catch(() => null);
+  alert(err?.error || `Erreur ${res.status}`);
+}
     } catch (error) {
       console.error('Error creating booking', error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const isPriceTonneKm = vehicle.pricingType === 'PER_TONNE_KM';
-  const isPricePerKm = vehicle.pricingType === 'PER_KM';
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -122,7 +187,6 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
             </div>
           </div>
 
-          {/* Show freteur's price range if set */}
           {(vehicle.minPrice || vehicle.maxPrice) && (
             <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
               <Info className="h-3.5 w-3.5 flex-shrink-0" />
@@ -170,72 +234,83 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
             </div>
           </div>
 
-          {/* Tonne-km inputs */}
-          {(isPriceTonneKm || isPricePerKm) && (
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                <Weight className="h-4 w-4 text-slate-400" />
-                Détails du transport
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {isPriceTonneKm && (
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Tonnage (T)</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.1"
-                      placeholder="Ex: 20"
-                      className="w-full border border-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                      value={formData.tonnage}
-                      onChange={(e) => setFormData({ ...formData, tonnage: e.target.value })}
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Distance estimée (km)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    placeholder="Ex: 300"
-                    className="w-full border border-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    value={formData.distanceKm}
-                    onChange={(e) => setFormData({ ...formData, distanceKm: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Locations */}
+          {/* Trajet — carte */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
               <MapPin className="h-4 w-4 text-slate-400" />
               Trajet
             </label>
-            <div className="space-y-3">
+            <div className="rounded-lg overflow-hidden border border-slate-200">
+              <RouteMap
+                onPointsSelected={handlePointsSelected}
+                routeSegments={routeSegments}
+                height="300px"
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Cliquez deux fois sur la carte : départ, puis arrivée.</p>
+
+            {(formData.startLocation || formData.endLocation) && (
+              <div className="mt-3 space-y-1.5 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-semibold text-slate-500 mt-0.5 shrink-0">Départ :</span>
+                  <span className="text-slate-700">{formData.startLocation || 'Non défini'}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-semibold text-slate-500 mt-0.5 shrink-0">Arrivée :</span>
+                  <span className="text-slate-700">{formData.endLocation || 'Non défini'}</span>
+                </div>
+              </div>
+            )}
+
+            {isAnalysingTrajet && (
+              <p className="text-xs text-blue-600 mt-2">Analyse du trajet en cours...</p>
+            )}
+
+            {trajetAnalyse && (
+              <div className="mt-2 flex gap-2 text-xs">
+                <span className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Goudron : {trajetAnalyse.km_goudron.toFixed(1)} km
+                </span>
+                {(trajetAnalyse.km_piste_praticable + trajetAnalyse.km_piste_degradee) > 0 && (
+                  <span className="px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
+                    Piste : {(trajetAnalyse.km_piste_praticable + trajetAnalyse.km_piste_degradee).toFixed(1)} km
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Tonne-km inputs */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+              <Weight className="h-4 w-4 text-slate-400" />
+              Détails du transport
+            </label>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Lieu de départ</label>
+                <label className="block text-xs text-slate-500 mb-1">Tonnage (T)</label>
                 <input
-                  type="text"
+                  type="number"
                   required
-                  placeholder="Ex: Abidjan, Zone Industrielle"
+                  min="0"
+                  step="0.1"
+                  placeholder="Ex: 20"
                   className="w-full border border-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                  value={formData.startLocation}
-                  onChange={(e) => setFormData({ ...formData, startLocation: e.target.value })}
+                  value={formData.tonnage}
+                  onChange={(e) => setFormData({ ...formData, tonnage: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Lieu d&#39;arrivée</label>
+                <label className="block text-xs text-slate-500 mb-1">Distance (km)</label>
                 <input
-                  type="text"
+                  type="number"
                   required
-                  placeholder="Ex: San Pedro, Port"
-                  className="w-full border border-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                  value={formData.endLocation}
-                  onChange={(e) => setFormData({ ...formData, endLocation: e.target.value })}
+                  min="0"
+                  readOnly={isAnalysingTrajet || !!trajetAnalyse}
+                  placeholder={isAnalysingTrajet ? 'Calcul en cours...' : 'Calculée depuis la carte'}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition read-only:bg-slate-50 read-only:text-slate-500"
+                  value={formData.distanceKm}
+                  onChange={(e) => setFormData({ ...formData, distanceKm: e.target.value })}
                 />
               </div>
             </div>
@@ -254,41 +329,24 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
                   <Calculator className="h-4 w-4 text-blue-600" />
                   <span className="font-medium text-slate-700">Calcul automatique</span>
                 </div>
-                {isPriceTonneKm ? (
-                  <div className="grid grid-cols-4 gap-2 text-sm">
-                    <div className="text-center p-2 bg-white rounded border">
-                      <p className="text-slate-500 text-xs">Tarif</p>
-                      <p className="font-bold text-slate-900">{vehicle.pricePerTonneKm} F/T·km</p>
-                    </div>
-                    <div className="text-center p-2 bg-white rounded border">
-                      <p className="text-slate-500 text-xs">Tonnage</p>
-                      <p className="font-bold text-slate-900">{formData.tonnage || '?'} T</p>
-                    </div>
-                    <div className="text-center p-2 bg-white rounded border">
-                      <p className="text-slate-500 text-xs">Distance</p>
-                      <p className="font-bold text-slate-900">{formData.distanceKm || '?'} km</p>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
-                      <p className="text-blue-600 text-xs">Total</p>
-                      <p className="font-bold text-blue-700">{suggestedPrice.toLocaleString()} F</p>
-                    </div>
+                <div className="grid grid-cols-4 gap-2 text-sm">
+                  <div className="text-center p-2 bg-white rounded border">
+                    <p className="text-slate-500 text-xs">Tarif</p>
+                    <p className="font-bold text-slate-900">{vehicle.pricePerTonneKm} F/T·km</p>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div className="text-center p-2 bg-white rounded border">
-                      <p className="text-slate-500 text-xs">{vehicle.pricingType === 'PER_DAY' ? 'Prix/jour' : 'Prix/km'}</p>
-                      <p className="font-bold text-slate-900">{(vehicle.pricePerDay || vehicle.pricePerKm)?.toLocaleString()} F</p>
-                    </div>
-                    <div className="text-center p-2 bg-white rounded border">
-                      <p className="text-slate-500 text-xs">{vehicle.pricingType === 'PER_DAY' ? 'Jours' : 'km'}</p>
-                      <p className="font-bold text-slate-900">{vehicle.pricingType === 'PER_DAY' ? numberOfDays : formData.distanceKm || '?'}</p>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
-                      <p className="text-blue-600 text-xs">Total suggéré</p>
-                      <p className="font-bold text-blue-700">{suggestedPrice.toLocaleString()} F</p>
-                    </div>
+                  <div className="text-center p-2 bg-white rounded border">
+                    <p className="text-slate-500 text-xs">Tonnage</p>
+                    <p className="font-bold text-slate-900">{formData.tonnage || '?'} T</p>
                   </div>
-                )}
+                  <div className="text-center p-2 bg-white rounded border">
+                    <p className="text-slate-500 text-xs">Distance</p>
+                    <p className="font-bold text-slate-900">{formData.distanceKm || '?'} km</p>
+                  </div>
+                  <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
+                    <p className="text-blue-600 text-xs">Total</p>
+                    <p className="font-bold text-blue-700">{suggestedPrice.toLocaleString()} F</p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -305,7 +363,6 @@ export default function BookingModal({ vehicle, onClose }: { vehicle: Vehicle; o
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">FCFA</span>
             </div>
 
-            {/* Affréteur budget range */}
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <p className="text-xs font-semibold text-slate-600 mb-2">Votre fourchette de budget (optionnel)</p>
               <div className="grid grid-cols-2 gap-3">

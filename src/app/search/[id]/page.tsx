@@ -4,13 +4,24 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import {
   ArrowLeft, Truck, MapPin, ToggleLeft, ToggleRight, Edit, Trash2,
   AlertTriangle, X, Calendar, Fuel, Settings, Weight, Box,
   FileText, Image as ImageIcon, ChevronLeft, ChevronRight,
   CheckCircle2, XCircle, Shield, Car, Navigation, DollarSign,
-  Clock, Hash, Palette, Zap
+  Clock, Hash, Palette, Zap, AlertCircle
 } from 'lucide-react';
+
+interface BookedDate {
+  startDate: string;
+  endDate: string;
+  startLocation?: string;
+  endLocation?: string;
+  type?: 'internal' | 'external';
+  status?: string;
+}
 
 interface Vehicle {
   id: string;
@@ -71,6 +82,21 @@ export default function VehicleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [activePhoto, setActivePhoto] = useState(0);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [viewingDates, setViewingDates] = useState<{ vehicle: Vehicle; dates: BookedDate[] } | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+
+  const fetchBookedDates = async (vehicle: Vehicle) => {
+    setLoadingDates(true);
+    try {
+      const res = await fetch(`/api/vehicles/${vehicle.id}/bookings`);
+      const dates = await res.json();
+      setViewingDates({ vehicle, dates });
+    } catch (error) {
+      console.error('Error fetching booked dates:', error);
+    }
+    setLoadingDates(false);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
@@ -103,8 +129,6 @@ export default function VehicleDetailPage() {
       return `${v.pricePerKm.toLocaleString()} FCFA/km`;
     if (v.pricingType === 'PER_TONNE_KM' && v.pricePerTonneKm)
       return `${v.pricePerTonneKm.toLocaleString()} FCFA/t·km`;
-    if (v.pricePerDay)
-      return `${v.pricePerDay.toLocaleString()} FCFA/jour`;
     return '—';
   };
 
@@ -133,18 +157,18 @@ export default function VehicleDetailPage() {
       {/* Back + Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
-          href="/vehicles"
+          href="/search"
           className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 transition font-medium text-sm"
         >
           <ArrowLeft size={18} /> Retour aux véhicules
         </Link>
         <div className="flex items-center gap-2 flex-wrap">
-          <Link
-            href={`/vehicles/${vehicle.id}/availability`}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition text-sm font-medium"
+          <button
+            onClick={(e) => { e.preventDefault(); fetchBookedDates(vehicle) }}
+            className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition"
           >
             <Calendar size={16} /> Indisponibilités
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -233,7 +257,7 @@ export default function VehicleDetailPage() {
                 )}
               </div>
             </div>
-            <div className="text-right">
+            {/* <div className="text-right">
               <p className="text-2xl font-bold text-blue-600">{formatPrice(vehicle)}</p>
               <p className="text-xs text-slate-400 mt-0.5">{PRICING_LABELS[vehicle.pricingType]}</p>
               {vehicle.minPrice && vehicle.maxPrice && (
@@ -241,7 +265,7 @@ export default function VehicleDetailPage() {
                   Min {vehicle.minPrice.toLocaleString()} — Max {vehicle.maxPrice.toLocaleString()} FCFA
                 </p>
               )}
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -298,7 +322,7 @@ export default function VehicleDetailPage() {
         </section>
 
         {/* Tarification */}
-        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        {/* <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
             <DollarSign size={18} className="text-green-500" /> Tarification
           </h2>
@@ -326,7 +350,7 @@ export default function VehicleDetailPage() {
               <p>{vehicle.conditions}</p>
             </div>
           )}
-        </section>
+        </section> */}
       </div>
 
       {/* Photos gallery grid */}
@@ -360,6 +384,97 @@ export default function VehicleDetailPage() {
               ))}
           </div>
         </section>
+      )}
+
+      {/* Booked Dates Modal */}
+      {viewingDates && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg text-slate-900">Disponibilités</h3>
+                <p className="text-sm text-slate-500">{viewingDates.vehicle.brand} {viewingDates.vehicle.model}</p>
+              </div>
+              <button
+                onClick={() => setViewingDates(null)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition"
+              >
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[60vh]">
+              {loadingDates ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : viewingDates.dates.length === 0 ? (
+                <div className="text-center py-10">
+                  <Calendar className="h-12 w-12 text-green-300 mx-auto mb-3" />
+                  <p className="font-medium text-green-700">Ce véhicule est disponible</p>
+                  <p className="text-sm text-slate-500 mt-1">Aucune réservation en cours</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <AlertCircle className="text-blue-500 shrink-0 mt-0.5" size={18} />
+                    <p className="text-sm text-blue-800">
+                      Les dates et trajets affichés vous permettent de planifier un <strong>fret retour</strong> ou une nouvelle mission depuis la destination finale.
+                    </p>
+                  </div>
+                  {viewingDates.dates.map((date, index) => (
+                    <div key={index} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="text-slate-400" size={16} />
+                          <span className="text-sm font-medium text-slate-900">
+                            {format(new Date(date.startDate), 'dd MMM yyyy', { locale: fr })}
+                            {' → '}
+                            {format(new Date(date.endDate), 'dd MMM yyyy', { locale: fr })}
+                          </span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${date.type === 'external'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-orange-100 text-orange-700'
+                          }`}>
+                          {date.type === 'external' ? 'Hors appli' : 'Réservé'}
+                        </span>
+                      </div>
+                      {date.startLocation && date.endLocation && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-1 text-slate-600">
+                            <MapPin size={14} className="text-green-500" />
+                            <span>{date.startLocation}</span>
+                          </div>
+                          <span className="text-slate-400">→</span>
+                          <div className="flex items-center gap-1 text-slate-600">
+                            <MapPin size={14} className="text-red-500" />
+                            <span className="font-medium text-slate-800">{date.endLocation}</span>
+                          </div>
+                        </div>
+                      )}
+                      {date.endLocation && (
+                        <p className="text-xs text-green-600 mt-2">
+                          💡 Disponible à <strong>{date.endLocation}</strong> après le {format(new Date(date.endDate), 'dd MMMM yyyy', { locale: fr })}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-slate-100">
+              <button
+                onClick={(e) => {
+                  setViewingDates(null);
+                  setSelectedVehicle(viewingDates.vehicle);
+                }}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition"
+              >
+                Réserver ce véhicule
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
